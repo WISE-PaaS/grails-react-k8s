@@ -1,6 +1,6 @@
 # grails-react-k8s
 
-This is a sample code to demonstrate how to deploy a simple static page to the EnSaaS 4.0.
+This project is to demonstrate how to deploy an **React** application built with **Grails** to the **EnSaaS 4.0**.
 
 
 
@@ -27,29 +27,47 @@ You may overwrite the ``KUBECONFIG`` environment variable to direct Kubernetes t
 ## 3. Clone the Sample Code from WISE-PaaS GitHub
 
 ```bash
-git clone git@github.com:allguitars/static-page-k8s.git
-cd static-page-k8s/
+git clone git@github.com:WISE-PaaS/grails-react-k8s.git
+cd grails-react-k8s/
 ```
 
 <br>
 
 ## 4. Building & Pushing Docker Image
 
-- Specify a tag when building the image.
+In this project, we use **Grails** to create an **React** application. While building the image, we copy over the ``build`` folder to an Nginx container to serve the application.
 
-  ```bash
-  docker build -t <DockerHubAccount>/<ImageName>:<Tag> .
-  ```
+**Dockerfile:**
 
-  For example: ``wise-paas/static-k8s:v1.0.0``
+```dockerfile
+FROM tubbynl/grails as builder
+WORKDIR /app
+RUN grails create-app myreact -profile react
+WORKDIR /app/myreact
+RUN ./gradlew client:build
+# CMD ["./gradlew", "client:start"]
 
-  <br>
+FROM nginx
+EXPOSE 3000
+COPY ./nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/myreact/client/build /usr/share/nginx/html
+```
 
-- Push the new image to your own Docker Repository.
+<br>
 
-  ```bash
-  docker push <DockerHubAccount>/<ImageName>:<Tag>
-  ```
+First, build the image while specifying a tag.
+
+```bash
+docker build -t <DockerHubAccount>/<ImageName>:<Tag> .
+```
+
+For example: ``wise-paas/grails-react:v1.0.0``
+
+Then, push the new image to your own Docker Repository.
+
+```bash
+docker push <DockerHubAccount>/<ImageName>:<Tag>
+```
 
 <br>
 
@@ -59,7 +77,7 @@ It requires some minimun effort to take this code and deploy it to the EnSaaS 4.
 
 ### I. Setting Up the Host
 
-Modify the ``host`` attribute in ``./k8s-config/ingress-service.yaml``.
+Modify the ``host`` attribute in ``./k8s/ingress-service.yaml``.
 
 ![ingress-host](./img/ingress-host.png)
 
@@ -69,13 +87,13 @@ Modify the ``host`` attribute in ``./k8s-config/ingress-service.yaml``.
 
 ``ApplicationName``.``Workspace``.``Cluster``.**internal**
 
-Note that ``internal`` keyword is required at the end of the string.
+In this example, the ``ApplicationName`` is ``grails``. Note that ``internal`` keyword is **required** at the end of the string.
 
 <br>
 
-### II. Change the Docker Image Name
+### II. Changing the Docker Image Name
 
-Change the ``image`` attribute inside ``./k8s-config/static-deployment.yaml`` file according to the image you just built.
+Change the ``image`` attribute inside ``./k8s/client-deployment.yaml`` file according to the image you just built and pushed.
 
 ```
 <DockerHubAccount>/<ImageName>:<Tag>
@@ -89,7 +107,7 @@ Here is the example in this code:
 
 ### III. Setting Up the Resource Usage
 
-Modify the ``resources`` attribute inside ``./k8s-config/static-deployment.yaml`` file.
+Adjust the ``resources`` attribute inside ``./k8s/client-deployment.yaml`` file.
 
 ![resources](./img/resources.png)
 
@@ -97,7 +115,7 @@ Modify the ``resources`` attribute inside ``./k8s-config/static-deployment.yaml`
 
 ## 5. Appying the Configuration
 
-**Note**: Always remember to specify the **namespace** that you are working on while applying the Kubernetes configuration.
+**Note**: Always remember to specify the ``namespace`` that you are working on while applying the Kubernetes configurations.
 
 The following screenshot shows that the namespace is *playgroud*. Yours might be different.
 
@@ -108,7 +126,7 @@ The following screenshot shows that the namespace is *playgroud*. Yours might be
 Apply the Kubernetes configuration.
 
 ```bash
-kubectl apply -f k8s-config/ --namespace <NameSpace>
+kubectl apply -f k8s/ --namespace <NameSpace>
 ```
 
 <br>
@@ -118,17 +136,17 @@ Check all resources (also with namespace):
 ```bash
 kubectl get all --namespace playground
 
-NAME                                     READY   STATUS    RESTARTS   AGE
-pod/static-deployment-5d996d5d54-97zql   1/1     Running   0          124m
+NAME                                   READY   STATUS    RESTARTS   AGE
+pod/client-deployment-9d9f994b-4q6zl   1/1     Running   0          40m
 
 NAME                                TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
-service/static-cluster-ip-service   ClusterIP   10.0.201.35   <none>        3000/TCP   124m
+service/client-cluster-ip-service   ClusterIP   10.0.91.167   <none>        3000/TCP   44m
 
 NAME                                READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/static-deployment   1/1     1            1           124m
+deployment.apps/client-deployment   1/1     1            1           40m
 
-NAME                                           DESIRED   CURRENT   READY   AGE
-replicaset.apps/static-deployment-5d996d5d54   1         1         1       124m
+NAME                                         DESIRED   CURRENT   READY   AGE
+replicaset.apps/client-deployment-9d9f994b   1         1         1       40m
 ```
 
 <br>
@@ -138,24 +156,24 @@ replicaset.apps/static-deployment-5d996d5d54   1         1         1       124m
 In the sample code, we set the host for the Ingress service.
 
 ```yaml
-host: static.se.slave04.internal
+host: grails.se.slave04.internal
 ```
 
 So, to see the page, we need to go to the following URL:
 
-http://static-se-slave04.es.wise-paas.cn/
+http://grails-se-slave04.es.wise-paas.cn/
 
 <br>
 
 Mapping rule -- host vs. URL
 
-- host
+- **host**
 
   ```
   <AppName>.<Workspace>.<Cluster>.internal
   ```
 
-- External URL
+- **External URL**
 
   ```
   <AppName>-<Workspace>-<Cluster>.es.wise-paas.cn
@@ -163,7 +181,7 @@ Mapping rule -- host vs. URL
 
   <br>
 
-The page should look like:
+The website should look like:
 
 ![ensaas-4.0](./img/result.png)
 
