@@ -113,7 +113,7 @@ Adjust the ``resources`` attribute inside ``./k8s/client-deployment.yaml`` file.
 
 <br>
 
-## 5. Appying the Configuration
+## 5. Applying the Configuration
 
 **Note**: Always remember to specify the ``namespace`` that you are working on while applying the Kubernetes configurations.
 
